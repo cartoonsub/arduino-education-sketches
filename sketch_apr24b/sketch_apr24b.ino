@@ -37,13 +37,14 @@ AHT10Class AHT10;
 // This function is called every time the Virtual Pin 0 state changes
 BLYNK_WRITE(V0)
 {
-  Serial.println("V0 change");
   // Set incoming value from pin V0 to a variable
   int value = param.asInt();
-  Serial.println(value);
   if (value == 1) {
     Serial.println("V0 change 1");
     digitalWrite(relay_pin, 1);
+    delay(3000);
+    digitalWrite(relay_pin, 0);
+    Blynk.virtualWrite(V0, 0);
     }
   if (value == 0) {
     digitalWrite(relay_pin, 0);
@@ -98,6 +99,7 @@ void setup()
 
   // Setup a function to be called every second
   timer.setInterval(1000L, myTimerEvent);
+  
   Wire.begin();
   if(AHT10.begin(eAHT10Address_Low)) {
       Serial.println("Init AHT10 Sucess.");
@@ -108,6 +110,7 @@ void setup()
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(relay_pin, OUTPUT);        // пин реле как выход
     digitalWrite(relay_pin, 0);
+    digitalWrite(LED_BUILTIN, LOW);
 }
 
 void loop()
