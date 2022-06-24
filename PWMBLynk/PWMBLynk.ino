@@ -20,6 +20,7 @@ BlynkTimer timer;
 AHT10Class AHT10;
 
 #define relay_pin D5 //  mosfet
+#define pwm_pin D6 //  PWM
 #define LED_BUILTIN 2
 
 BLYNK_WRITE(V0)
@@ -69,6 +70,14 @@ BLYNK_WRITE(V6)
   }
 
   Blynk.virtualWrite(V6, value);
+}
+
+BLYNK_WRITE(V8)
+{
+  int value = param.asInt();
+  
+  Serial.println(value);
+  analogWrite(pwm_pin, value);
 }
 
 // This function is called every time the device is connected to the Blynk.Cloud
