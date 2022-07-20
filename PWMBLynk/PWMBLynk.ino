@@ -46,16 +46,11 @@ BLYNK_WRITE(V7)
   int value = param.asInt();
   if (value == 1) {
     digitalWrite(relay_pin, 1);
-    delay(30000);
-    digitalWrite(relay_pin, 0);
-    Blynk.virtualWrite(V7, 0);
-    }
+  }
 
   if (value == 0) {
     digitalWrite(relay_pin, 0);
   }
-
-  Blynk.virtualWrite(V7, value);
 }
 
 BLYNK_WRITE(V6)
@@ -72,11 +67,9 @@ BLYNK_WRITE(V6)
   Blynk.virtualWrite(V6, value);
 }
 
-BLYNK_WRITE(V8)
+BLYNK_WRITE(V9)
 {
   int value = param.asInt();
-  
-  Serial.println(value);
   analogWrite(pwm_pin, value);
 }
 
@@ -103,10 +96,10 @@ void myTimerEvent()
 void setup()
 {
   Serial.begin(115200);
-  Blynk.begin(auth, ssid, pass);
+  analogWriteFreq(10000);
 
+  Blynk.begin(auth, ssid, pass);
   timer.setInterval(1000L, myTimerEvent);
-  
   Wire.begin();
   if (AHT10.begin(eAHT10Address_Low)) {
     Serial.println("Init AHT10 Sucess.");
@@ -117,7 +110,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(relay_pin, OUTPUT);
   digitalWrite(relay_pin, 0);
-  digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop()
