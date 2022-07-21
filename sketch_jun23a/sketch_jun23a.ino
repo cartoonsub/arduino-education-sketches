@@ -4,20 +4,14 @@
 
 void setup()
 {
-  Serial.begin(9600);
-  Serial.println("Init AHT10 Failure.");
-
   pinMode(LED_BUILTIN, OUTPUT);
- 
-  
-  digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop()
 {
-  delay(1000);
-  digitalWrite(LED_BUILTIN, LOW);
-  Serial.println("Fucked up");
-  delay(1000);
-  digitalWrite(LED_BUILTIN, HIGH);
+//  delay(1000);
+//  digitalWrite(LED_BUILTIN, LOW);
+//  delay(1000);
+//  digitalWrite(LED_BUILTIN, HIGH);
 }
