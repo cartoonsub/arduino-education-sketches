@@ -29,7 +29,7 @@ BLYNK_WRITE(V0)
   if (value == 1) {
     Serial.println("V0 change 1");
     digitalWrite(relay_pin, 1);
-    delay(3000);
+    delay(60000);
     digitalWrite(relay_pin, 0);
     Blynk.virtualWrite(V0, 0);
     }
