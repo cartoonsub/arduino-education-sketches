@@ -18,8 +18,8 @@
 
 // blynk
 char auth[] = BLYNK_AUTH_TOKEN;
-char ssid[] = "wifiHotSpot";
-char pass[] = "zasada13422442";
+char ssid[] = "RT-GPON-812A";
+char pass[] = "MW3HNUC8";
 
 BlynkTimer timer;
 AHT10Class AHT10;
@@ -103,8 +103,11 @@ void myTimerEvent()
   // Please don't send more that 10 values per second.
   Blynk.virtualWrite(V2, millis() / 1000);
 
-  Blynk.virtualWrite(V4, AHT10.GetTemperature());
-  Blynk.virtualWrite(V5, AHT10.GetHumidity());
+  float temp = AHT10.GetTemperature();
+  float hum = AHT10.GetHumidity();
+  Blynk.virtualWrite(V4, temp);
+  Blynk.virtualWrite(V5, hum);
+  testscrolltext(temp, hum);
 }
 
 void setup()
@@ -119,7 +122,7 @@ void setup()
 
   display.display();
   delay(2000); // Pause for 2 seconds
-  testscrolltext();
+  testscrolltext(0.0, 0.0);
   // Clear the buffer
   display.clearDisplay();
     
@@ -144,29 +147,16 @@ void loop()
   timer.run();
 }
 
-void testscrolltext(void) {
+void testscrolltext(float temp, float hum) {
   display.clearDisplay();
 
-  display.setTextSize(2); // Draw 2X-scale text
-  display.setTextColor(WHITE);
-  display.setCursor(10, 0);
-  display.println(F("let's go travel"));
-  display.display();      // Show initial text
-  delay(100);
-
-  // Scroll in various directions, pausing in-between:
-  display.startscrollright(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrollleft(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrolldiagright(0x00, 0x07);
-  delay(2000);
-  display.startscrolldiagleft(0x00, 0x07);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
+    display.setTextSize(1);             // Normal 1:1 pixel scale
+    display.setTextColor(WHITE);        // Draw white text
+    display.setCursor(0,0);             // Start at top-left corner
+    display.println("Temp: ");
+    display.println(temp);
+    display.println("C. Hum: ");
+    display.println(hum);
+    display.println("%");
+    display.display();
 }
