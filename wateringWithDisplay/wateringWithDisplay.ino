@@ -73,7 +73,52 @@ void loop()
 {
   unsigned long currentMillis = millis();
   
-  // Fan speed timer - change every 10 seconds
+  // Check for serial input to control fan speed and relay
+  if (Serial.available() > 0) {
+    String input = Serial.readString();
+    input.trim(); // Remove whitespace
+    
+    // Check if input is a number (fan speed control)
+    if (input.toInt() != 0 || input == "0") {
+      int inputSpeed = input.toInt();
+      if (inputSpeed >= 0 && inputSpeed <= 100) {
+        fanSpeed = inputSpeed;
+        int pwmValue = (fanSpeed * 1023) / 100;
+        analogWrite(pwm_pin, pwmValue);
+        
+        Serial.print("Manual fan speed set to: ");
+        Serial.print(fanSpeed);
+        Serial.print("% (PWM: ");
+        Serial.print(pwmValue);
+        Serial.println(")");
+      } else {
+        Serial.println("Error: Speed must be between 0-100%");
+      }
+    }
+    // Check for relay commands
+    else if (input == "relay on" || input == "r1" || input == "on") {
+      digitalWrite(relay_pin, HIGH);
+      Serial.println("Relay turned ON");
+    }
+    else if (input == "relay off" || input == "r0" || input == "off") {
+      digitalWrite(relay_pin, LOW);
+      Serial.println("Relay turned OFF");
+    }
+    else if (input == "help" || input == "h") {
+      Serial.println("Commands:");
+      Serial.println("  0-100    : Set fan speed (0-100%)");
+      Serial.println("  on/r1    : Turn relay ON");
+      Serial.println("  off/r0   : Turn relay OFF");
+      Serial.println("  help/h   : Show this help");
+    }
+    else {
+      Serial.println("Unknown command. Type 'help' for available commands.");
+    }
+  }
+  
+  // Fan speed timer - change every 10 seconds (disabled when manual control is used)
+  // Comment out this section if you want only manual control
+  /*
   if (currentMillis - previousFanMillis >= fanInterval) {
     previousFanMillis = currentMillis;
     
@@ -95,16 +140,7 @@ void loop()
       fanSpeed = 10;
     }
   }
-  
-  // Relay timer - blink every 2 seconds
-  if (currentMillis - previousRelayMillis >= relayInterval) {
-    previousRelayMillis = currentMillis;
-    relayState = !relayState;
-    // digitalWrite(relay_pin, relayState);
-    digitalWrite(relay_pin, HIGH); // Turn relay on
-    Serial.print("Relay state: ");
-    Serial.println(relayState ? "ON" : "OFF");
-  }
+  */
   
   // Sensor reading timer - every 1 second
   if (currentMillis - previousMillis >= interval) {
