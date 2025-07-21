@@ -51,6 +51,7 @@ void loop()
     Serial.println(String("")+"Humidity(%RH):\t\t"+AHT10.GetHumidity()+"%");
     Serial.println(String("")+"Temperature(℃):\t"+AHT10.GetTemperature()+"℃");
     Serial.println(String("")+"Dewpoint(℃):\t\t"+AHT10.GetDewPoint()+"℃");
+    Serial.println(String("")+"-----------------------------");
 
     digitalWrite(LED_BUILTIN, LOW);
     digitalWrite(relay_pin, 0);
