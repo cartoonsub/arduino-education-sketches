@@ -8,30 +8,24 @@ AHT10Class AHT10;
 #define LED_BUILTIN 2
 
 // === ИНИЦИАЛИЗАЦИЯ ДИСПЛЕЕВ (U8g2) ===
-// Дисплей 1 на первой шине (SCL = D1, SDA = D2)
-U8G2_SSD1306_128X64_NONAME_F_SW_I2C display1(U8G2_R0, /* clock=*/ D1, /* data=*/ D2, /* reset=*/ U8X8_PIN_NONE);
+// Дисплей 1 (ПОГОДА, 128x32) на первой шине (SCL = D1, SDA = D2)
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C display1(U8G2_R0, /* clock=*/ D1, /* data=*/ D2, /* reset=*/ U8X8_PIN_NONE);
 
-// Дисплей 2 на второй шине (SCL = D3, SDA = D4)
+// Дисплей 2 (КОТ, 128x64) на второй шине (SCL = D3, SDA = D4)
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C display2(U8G2_R0, /* clock=*/ D3, /* data=*/ D4, /* reset=*/ U8X8_PIN_NONE);
 
-// Таймеры
+// Таймер для датчика и погоды
 unsigned long previousMillis = 0;
 const long interval = 1000;
 
-unsigned long previousDisplayMillis = 0;
-const long displayModeInterval = 3000;
-
-enum DisplayMode { SHOW_CAT, SHOW_WEATHER };
-DisplayMode currentMode = SHOW_WEATHER;
-bool forceRedraw = true;
+// Таймер для анимации кота
+unsigned long previousAnimMillis = 0;
+const long animInterval = 150;
+int currentFrame = 0;
 
 float currentTemp = 0.0;
 float currentHum = 0.0;
 bool showSmile = true;
-
-unsigned long previousAnimMillis = 0;
-const long animInterval = 150;
-int currentFrame = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -51,13 +45,13 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
   
-  Serial.println("Setup completed!");
+  Serial.println("Setup completed! Starting loops...");
 }
 
 void loop() {
   unsigned long currentMillis = millis();
 
-  // 1. Опрос датчика раз в секунду
+  // === 1. Опрос датчика и обновление Дисплея 1 (Раз в секунду) ===
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     
@@ -70,93 +64,53 @@ void loop() {
 
     showSmile = (currentTemp > 20.0);
 
-    // Обновляем второй дисплей
-    updateDisplay2(currentTemp, currentHum);
+    // Отрисовываем погоду
+    updateWeatherDisplay(currentTemp, currentHum);
+  }
+
+  // === 2. Анимация Дисплея 2 (Каждые 150 мс) ===
+  if (currentMillis - previousAnimMillis >= animInterval) {
+    previousAnimMillis = currentMillis;
+    currentFrame = (currentFrame + 1) % 4;
     
-    if (currentMode == SHOW_WEATHER) {
-      forceRedraw = true; 
-    }
-  }
-
-  // 2. Смена режимов первого дисплея раз в 3 секунды
-  if (currentMillis - previousDisplayMillis >= displayModeInterval) {
-    previousDisplayMillis = currentMillis;
-    currentMode = (currentMode == SHOW_WEATHER) ? SHOW_CAT : SHOW_WEATHER;
-    forceRedraw = true;
-  }
-
-  // 3. Рендеринг первого дисплея
-  if (currentMode == SHOW_CAT) {
-    if ((currentMillis - previousAnimMillis >= animInterval) || forceRedraw) {
-      previousAnimMillis = currentMillis;
-      currentFrame = (currentFrame + 1) % 4;
-      updateCatDisplay();
-      forceRedraw = false;
-    }
-  } else { 
-    if (forceRedraw) {
-      updateWeatherDisplay(currentTemp, currentHum);
-      forceRedraw = false;
-    }
+    // Отрисовываем котика
+    updateCatDisplay();
   }
 }
 
-// Первый дисплей — погода
+// --- ФУНКЦИЯ ДЛЯ ДИСПЛЕЯ 1 (ПОГОДА 128x32) ---
 void updateWeatherDisplay(float temp, float hum) {
   display1.clearBuffer();
   
-  // Верхняя строка (Температура)
-  display1.setFont(u8g2_font_ncenB08_tr); // Мелкий шрифт
-  display1.setCursor(0, 20); // Y = 20 (базовая линия)
-  display1.print("TEMP: ");
+  // Шрифт среднего размера (~10 пикселей в высоту). Идеально для 2 строк.
+  display1.setFont(u8g2_font_ncenB10_tr); 
   
-  display1.setFont(u8g2_font_ncenB14_tr); // Крупный шрифт
+  // Строка 1: Температура (Y = 14)
+  display1.setCursor(0, 14); 
+  display1.print("T: ");
   display1.print(temp, 1);
-  
-  display1.setFont(u8g2_font_ncenB08_tr);
   display1.print(" C");
 
-  // Нижняя строка (Влажность)
-  display1.setCursor(0, 55); // Y = 55 (базовая линия)
-  display1.print("HUM:  ");
-  
-  display1.setFont(u8g2_font_ncenB14_tr);
+  // Строка 2: Влажность (Y = 32)
+  display1.setCursor(0, 32); 
+  display1.print("H: ");
   display1.print(hum, 1);
-  
-  display1.setFont(u8g2_font_ncenB08_tr);
   display1.print(" %");
   
   display1.sendBuffer();
 }
 
-// Первый дисплей — кот с анимацией
+// --- ФУНКЦИЯ ДЛЯ ДИСПЛЕЯ 2 (КОТИК 128x64) ---
 void updateCatDisplay() {
-  display1.clearBuffer();
+  display2.clearBuffer(); // Внимание: используем display2!
   
   if (showSmile) {
-    if (currentFrame == 0) display1.drawXBMP(0, 0, 128, 64, cat_happy_bmp);
-    else if (currentFrame == 1 || currentFrame == 3) display1.drawXBMP(0, 0, 128, 64, cat_happy_blink_bmp);
-    else if (currentFrame == 2) display1.drawXBMP(0, 0, 128, 64, cat_happy_closed_bmp);
+    if (currentFrame == 0) display2.drawXBMP(0, 0, 128, 64, cat_happy_bmp);
+    else if (currentFrame == 1 || currentFrame == 3) display2.drawXBMP(0, 0, 128, 64, cat_happy_blink_bmp);
+    else if (currentFrame == 2) display2.drawXBMP(0, 0, 128, 64, cat_happy_closed_bmp);
   } else {
-    display1.drawXBMP(0, 0, 128, 64, cat_sad_bmp);
+    display2.drawXBMP(0, 0, 128, 64, cat_sad_bmp);
   }
   
-  display1.sendBuffer();
-}
-
-// Второй дисплей
-void updateDisplay2(float temp, float hum) {
-  display2.clearBuffer();
-  
-  display2.setFont(u8g2_font_ncenB14_tr); // Крупный шрифт для второго экрана
-  
-  display2.setCursor(0, 25);
-  display2.print(temp, 1);
-  display2.print(" C");
-  
-  display2.setCursor(0, 55);
-  display2.print(hum, 1);
-  display2.print(" %");
-  
-  display2.sendBuffer(); 
+  display2.sendBuffer();
 }
