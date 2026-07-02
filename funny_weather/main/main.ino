@@ -102,15 +102,24 @@ void updateWeatherDisplay(float temp, float hum) {
 
 // --- ФУНКЦИЯ ДЛЯ ДИСПЛЕЯ 2 (КОТИК 128x64) ---
 void updateCatDisplay() {
-  display2.clearBuffer(); // Внимание: используем display2!
+  display2.clearBuffer(); 
+  
+  // todo - костыль - решить проблему с инверсией XBM-массивов. Временное решение: инвертируем цвета при отрисовке.
+  // Магия для инвертированных XBM-массивов:
+  display2.setBitmapMode(0); // Включаем "сплошной" режим отрисовки
+  display2.setDrawColor(0);  // Инвертируем цвета: единицы (фон) тушим, нули (кота) зажигаем
   
   if (showSmile) {
-    if (currentFrame == 0) display2.drawXBMP(0, 0, 128, 64, cat_happy_bmp);
-    else if (currentFrame == 1 || currentFrame == 3) display2.drawXBMP(0, 0, 128, 64, cat_happy_blink_bmp);
-    else if (currentFrame == 2) display2.drawXBMP(0, 0, 128, 64, cat_happy_closed_bmp);
+    if (currentFrame == 0) display2.drawXBMP(0, 0, 128, 64, cat_happy_bits);
+    else if (currentFrame == 1 || currentFrame == 3) display2.drawXBMP(0, 0, 128, 64, cat_happy_blink_bits);
+    else if (currentFrame == 2) display2.drawXBMP(0, 0, 128, 64, cat_happy_closed_bits);
   } else {
-    display2.drawXBMP(0, 0, 128, 64, cat_sad_bmp);
+    display2.drawXBMP(0, 0, 128, 64, cat_sad_bits);
   }
+  
+  // Обязательно возвращаем настройки в норму для остального текста/графики, если они будут
+  display2.setDrawColor(1);
+  display2.setBitmapMode(1);
   
   display2.sendBuffer();
 }
