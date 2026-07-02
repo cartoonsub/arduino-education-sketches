@@ -9,140 +9,142 @@ AHT10Class AHT10;
 
 #define LED_BUILTIN 2
 
-// Таймеры для логики (без delay)
+// Пины для первой шины (Дисплей 1 + AHT10)
+#define SDA_1 D2
+#define SCL_1 D1
+
+// Пины для второй шины (Дисплей 2)
+#define SDA_2 D6
+#define SCL_2 D5
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display2(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Таймеры
 unsigned long previousMillis = 0;
-const long interval = 1000; // Опрос датчика раз в секунду
+const long interval = 1000;
 
-// Переключение экранов (State Machine)
 unsigned long previousDisplayMillis = 0;
-const long displayModeInterval = 3000; // Менять экран каждые 3 секунды
-enum DisplayMode
-{
-  SHOW_CAT,
-  SHOW_WEATHER
-};
-DisplayMode currentMode = SHOW_WEATHER;
+const long displayModeInterval = 3000;
 
-// Переменные для данных
+enum DisplayMode { SHOW_CAT, SHOW_WEATHER };
+DisplayMode currentMode = SHOW_WEATHER;
+bool forceRedraw = true; 
+
 float currentTemp = 0.0;
 float currentHum = 0.0;
 bool showSmile = true;
 
-// Анимации
 unsigned long previousAnimMillis = 0;
-const long animInterval = 150; // Скорость смены кадров (150 мс)
+const long animInterval = 150;
 int currentFrame = 0;
 
-// Настройки дисплея
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-void setup()
-{
+void setup() {
   Serial.begin(115200);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
-  {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ;
-  }
-
-  display.clearDisplay();
-  display.display();
-
-  Wire.begin();
-  if (AHT10.begin(eAHT10Address_Low))
-  {
+  // Инициализация первой шины (Дисплей 1 + AHT10)
+  Wire.begin(SDA_1, SCL_1);
+  if (AHT10.begin(eAHT10Address_Low)) {
     Serial.println("Init AHT10 Success.");
-  }
-  else
-  {
+  } else {
     Serial.println("Init AHT10 Failure.");
   }
 
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("Display 1 failed"));
+  }
+  display.clearDisplay();
+  display.display();
+
+  // Инициализация второй шины (Дисплей 2)
+  Wire.begin(SDA_2, SCL_2);
+  if (!display2.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("Display 2 failed"));
+  }
+  display2.clearDisplay();
+  display2.display();
+
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
+  
+  // Убедимся, что по умолчанию шина 1 активна
+  Wire.begin(SDA_1, SCL_1);
 }
 
-void loop()
-{
+void loop() {
   unsigned long currentMillis = millis();
 
-  // 1. Неблокирующий опрос датчика (раз в 1 секунду)
-  if (currentMillis - previousMillis >= interval)
-  {
+  // 1. Опрос датчика раз в секунду
+  if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
+    
+    // Переключаемся на первую шину для датчика
+    Wire.begin(SDA_1, SCL_1); 
     currentTemp = AHT10.GetTemperature();
     currentHum = AHT10.GetHumidity();
 
-    // Дублируем в Serial
-    Serial.print("T: ");
-    Serial.print(currentTemp, 1);
-    Serial.print("C | ");
-    Serial.print("H: ");
-    Serial.print(currentHum, 1);
+    Serial.print("T: "); Serial.print(currentTemp, 1);
+    Serial.print("C | H: "); Serial.print(currentHum, 1);
     Serial.println("%");
 
-    if (currentTemp > 20.0)
-    {
-      showSmile = true;
-    }
-    else
-    {
-      showSmile = false;
+    showSmile = (currentTemp > 20.0);
+
+    // Обновляем второй дисплей сразу
+    updateDisplay2(currentTemp, currentHum);
+    
+    // Если мы в режиме погоды на 1-м дисплее, он тоже должен перерисоваться
+    if (currentMode == SHOW_WEATHER) {
+      forceRedraw = true; 
     }
   }
 
-  // 2. Неблокирующий автомат для дисплея (смена режимов раз в 3 секунды)
-  if (currentMillis - previousDisplayMillis >= displayModeInterval)
-  {
+  // 2. Смена режимов первого дисплея раз в 3 секунды
+  if (currentMillis - previousDisplayMillis >= displayModeInterval) {
     previousDisplayMillis = currentMillis;
-
-    if (currentMode == SHOW_WEATHER)
-    {
-      currentMode = SHOW_CAT;
-    }
-    else
-    {
-      currentMode = SHOW_WEATHER;
-    }
+    currentMode = (currentMode == SHOW_WEATHER) ? SHOW_CAT : SHOW_WEATHER;
+    forceRedraw = true; // Перерисовываем экран сразу после смены режима
   }
 
-  // 3. Динамический рендеринг экрана в зависимости от текущего режима
-  if (currentMode == SHOW_WEATHER)
-  {
-    updateWeatherDisplay(currentTemp, currentHum);
-  }
-  else
-  {
-    updateCatDisplay();
+  // 3. Рендеринг первого дисплея (включая анимацию)
+  if (currentMode == SHOW_CAT) {
+    // Анимация только по таймеру ИЛИ при принудительной перерисовке (смена режима)
+    if ((currentMillis - previousAnimMillis >= animInterval) || forceRedraw) {
+      previousAnimMillis = currentMillis;
+      currentFrame = (currentFrame + 1) % 4;
+      updateCatDisplay();
+      forceRedraw = false; // Сбрасываем флаг только после отрисовки
+    }
+  } else { // Режим SHOW_WEATHER
+    if (forceRedraw) {
+      updateWeatherDisplay(currentTemp, currentHum);
+      forceRedraw = false;
+    }
   }
 }
 
-// Отрисовка погоды (без delay, с жесткими координатами)
-void updateWeatherDisplay(float temp, float hum)
-{
+// --- Функции отрисовки (для первого дисплея) ---
+void updateWeatherDisplay(float temp, float hum) {
+  // Переключаемся на первую шину перед отрисовкой
+  Wire.begin(SDA_1, SCL_1); 
+
   display.clearDisplay();
   display.setTextColor(WHITE);
 
-  // Строка температуры
   display.setCursor(0, 4);
   display.setTextSize(1);
   display.print("TEMP: ");
-
   display.setTextSize(2);
   display.print(temp, 1);
   display.setTextSize(1);
   display.print(" C");
 
-  // Строка влажности
   display.setCursor(0, 36);
   display.setTextSize(1);
   display.print("HUM:  ");
-
   display.setTextSize(2);
   display.print(hum, 1);
   display.setTextSize(1);
@@ -151,42 +153,40 @@ void updateWeatherDisplay(float temp, float hum)
   display.display();
 }
 
-void updateCatDisplay()
-{
-  unsigned long currentMillis = millis();
-
-  // Неблокирующий таймер анимации кадров кота
-  if (currentMillis - previousAnimMillis >= animInterval)
-  {
-    previousAnimMillis = currentMillis;
-    currentFrame++;
-    if (currentFrame >= 4)
-    {
-      currentFrame = 0;
-    }
-  }
+void updateCatDisplay() {
+  // Переключаемся на первую шину перед отрисовкой анимации
+  Wire.begin(SDA_1, SCL_1); 
 
   display.clearDisplay();
 
-  if (showSmile) // Если кот сейчас в добром настроении, крутим анимацию моргания
-  {
+  if (showSmile) {
     if (currentFrame == 0)
-    {
       display.drawBitmap(0, 0, cat_happy_bmp, 128, 64, WHITE);
-    }
     else if (currentFrame == 1 || currentFrame == 3)
-    {
       display.drawBitmap(0, 0, cat_happy_blink_bmp, 128, 64, WHITE);
-    }
     else if (currentFrame == 2)
-    {
       display.drawBitmap(0, 0, cat_happy_closed_bmp, 128, 64, WHITE);
-    }
-  }
-  else // Если кот грустный — оставляем статичную картинку
-  {
+  } else {
     display.drawBitmap(0, 0, cat_sad_bmp, 128, 64, WHITE);
   }
 
   display.display();
+}
+
+// --- Функция отрисовки (для второго дисплея) ---
+void updateDisplay2(float temp, float hum) {
+  // Переключаемся на вторую шину перед отрисовкой
+  Wire.begin(SDA_2, SCL_2); 
+  
+  display2.clearDisplay();
+  display2.setTextColor(WHITE);
+  display2.setTextSize(2);
+  display2.setCursor(0, 10);
+  display2.print(temp, 1);
+  display2.print(" C");
+  display2.setCursor(0, 36);
+  display2.print(hum, 1);
+  display2.print(" %");
+  
+  display2.display(); 
 }
