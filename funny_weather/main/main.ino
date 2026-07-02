@@ -30,6 +30,11 @@ float currentTemp = 0.0;
 float currentHum = 0.0;
 bool showSmile = true;
 
+// Анимации
+unsigned long previousAnimMillis = 0;
+const long animInterval = 150; // Скорость смены кадров (150 мс)
+int currentFrame = 0;
+
 // Настройки дисплея
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -93,7 +98,9 @@ void loop()
     if (currentTemp > 20.0)
     {
       showSmile = true;
-    } else {
+    }
+    else
+    {
       showSmile = false;
     }
   }
@@ -153,17 +160,42 @@ void updateWeatherDisplay(float temp, float hum)
   display.display();
 }
 
-// Отрисовка кота (без delay)
 void updateCatDisplay()
 {
-  display.clearDisplay();
-  if (showSmile)
+  unsigned long currentMillis = millis();
+
+  // Неблокирующий таймер анимации кадров кота
+  if (currentMillis - previousAnimMillis >= animInterval)
   {
-    display.drawBitmap(0, 0, cat_happy_bmp, 128, 64, WHITE);
+    previousAnimMillis = currentMillis;
+    currentFrame++;
+    if (currentFrame >= 4)
+    {
+      currentFrame = 0;
+    }
   }
-  else
+
+  display.clearDisplay();
+
+  if (showSmile) // Если кот сейчас в добром настроении, крутим анимацию моргания
+  {
+    if (currentFrame == 0)
+    {
+      display.drawBitmap(0, 0, cat_happy_bmp, 128, 64, WHITE);
+    }
+    else if (currentFrame == 1 || currentFrame == 3)
+    {
+      display.drawBitmap(0, 0, cat_happy_blink_bmp, 128, 64, WHITE);
+    }
+    else if (currentFrame == 2)
+    {
+      display.drawBitmap(0, 0, cat_happy_closed_bmp, 128, 64, WHITE);
+    }
+  }
+  else // Если кот грустный — оставляем статичную картинку
   {
     display.drawBitmap(0, 0, cat_sad_bmp, 128, 64, WHITE);
   }
+
   display.display();
 }
