@@ -7,8 +7,6 @@
 
 AHT10Class AHT10;
 
-#define relay_pin D5 // mosfet
-#define pwm_pin D6   // PWM
 #define LED_BUILTIN 2
 
 // Таймеры для логики (без delay)
@@ -44,8 +42,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 void setup()
 {
   Serial.begin(115200);
-  analogWriteFreq(2000);
-  analogWriteRange(1023);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {
@@ -68,12 +64,7 @@ void setup()
   }
 
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(relay_pin, OUTPUT);
-  pinMode(pwm_pin, OUTPUT);
-  digitalWrite(relay_pin, LOW);
   digitalWrite(LED_BUILTIN, HIGH);
-
-  analogWrite(pwm_pin, 102); // 10% PWM
 }
 
 void loop()
