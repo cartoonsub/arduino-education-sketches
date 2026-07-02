@@ -1,28 +1,18 @@
 #include <Wire.h>
 #include <Thinary_AHT10.h>
-#include <SPI.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <U8g2lib.h>
 #include "icons.h"
 
 AHT10Class AHT10;
 
 #define LED_BUILTIN 2
 
-// Пины для первой шины (Дисплей 1 + AHT10)
-#define SDA_1 D2
-#define SCL_1 D1
+// === ИНИЦИАЛИЗАЦИЯ ДИСПЛЕЕВ (U8g2) ===
+// Дисплей 1 на первой шине (SCL = D1, SDA = D2)
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C display1(U8G2_R0, /* clock=*/ D1, /* data=*/ D2, /* reset=*/ U8X8_PIN_NONE);
 
-// Пины для второй шины (Дисплей 2)
-#define SDA_2 D6
-#define SCL_2 D5
-
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-Adafruit_SSD1306 display2(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// Дисплей 2 на второй шине (SCL = D3, SDA = D4)
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C display2(U8G2_R0, /* clock=*/ D3, /* data=*/ D4, /* reset=*/ U8X8_PIN_NONE);
 
 // Таймеры
 unsigned long previousMillis = 0;
@@ -33,7 +23,7 @@ const long displayModeInterval = 3000;
 
 enum DisplayMode { SHOW_CAT, SHOW_WEATHER };
 DisplayMode currentMode = SHOW_WEATHER;
-bool forceRedraw = true; 
+bool forceRedraw = true;
 
 float currentTemp = 0.0;
 float currentHum = 0.0;
@@ -46,33 +36,22 @@ int currentFrame = 0;
 void setup() {
   Serial.begin(115200);
 
-  // Инициализация первой шины (Дисплей 1 + AHT10)
-  Wire.begin(SDA_1, SCL_1);
+  // 1. Инициализация аппаратной шины для датчика AHT10
+  Wire.begin(D2, D1); // SDA = D2, SCL = D1
   if (AHT10.begin(eAHT10Address_Low)) {
     Serial.println("Init AHT10 Success.");
   } else {
     Serial.println("Init AHT10 Failure.");
   }
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("Display 1 failed"));
-  }
-  display.clearDisplay();
-  display.display();
-
-  // Инициализация второй шины (Дисплей 2)
-  Wire.begin(SDA_2, SCL_2);
-  if (!display2.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("Display 2 failed"));
-  }
-  display2.clearDisplay();
-  display2.display();
+  // 2. Инициализация дисплеев
+  display1.begin();
+  display2.begin();
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
   
-  // Убедимся, что по умолчанию шина 1 активна
-  Wire.begin(SDA_1, SCL_1);
+  Serial.println("Setup completed!");
 }
 
 void loop() {
@@ -82,8 +61,6 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     
-    // Переключаемся на первую шину для датчика
-    Wire.begin(SDA_1, SCL_1); 
     currentTemp = AHT10.GetTemperature();
     currentHum = AHT10.GetHumidity();
 
@@ -93,10 +70,9 @@ void loop() {
 
     showSmile = (currentTemp > 20.0);
 
-    // Обновляем второй дисплей сразу
+    // Обновляем второй дисплей
     updateDisplay2(currentTemp, currentHum);
     
-    // Если мы в режиме погоды на 1-м дисплее, он тоже должен перерисоваться
     if (currentMode == SHOW_WEATHER) {
       forceRedraw = true; 
     }
@@ -106,19 +82,18 @@ void loop() {
   if (currentMillis - previousDisplayMillis >= displayModeInterval) {
     previousDisplayMillis = currentMillis;
     currentMode = (currentMode == SHOW_WEATHER) ? SHOW_CAT : SHOW_WEATHER;
-    forceRedraw = true; // Перерисовываем экран сразу после смены режима
+    forceRedraw = true;
   }
 
-  // 3. Рендеринг первого дисплея (включая анимацию)
+  // 3. Рендеринг первого дисплея
   if (currentMode == SHOW_CAT) {
-    // Анимация только по таймеру ИЛИ при принудительной перерисовке (смена режима)
     if ((currentMillis - previousAnimMillis >= animInterval) || forceRedraw) {
       previousAnimMillis = currentMillis;
       currentFrame = (currentFrame + 1) % 4;
       updateCatDisplay();
-      forceRedraw = false; // Сбрасываем флаг только после отрисовки
+      forceRedraw = false;
     }
-  } else { // Режим SHOW_WEATHER
+  } else { 
     if (forceRedraw) {
       updateWeatherDisplay(currentTemp, currentHum);
       forceRedraw = false;
@@ -126,67 +101,62 @@ void loop() {
   }
 }
 
-// --- Функции отрисовки (для первого дисплея) ---
+// Первый дисплей — погода
 void updateWeatherDisplay(float temp, float hum) {
-  // Переключаемся на первую шину перед отрисовкой
-  Wire.begin(SDA_1, SCL_1); 
-
-  display.clearDisplay();
-  display.setTextColor(WHITE);
-
-  display.setCursor(0, 4);
-  display.setTextSize(1);
-  display.print("TEMP: ");
-  display.setTextSize(2);
-  display.print(temp, 1);
-  display.setTextSize(1);
-  display.print(" C");
-
-  display.setCursor(0, 36);
-  display.setTextSize(1);
-  display.print("HUM:  ");
-  display.setTextSize(2);
-  display.print(hum, 1);
-  display.setTextSize(1);
-  display.print(" %");
-
-  display.display();
-}
-
-void updateCatDisplay() {
-  // Переключаемся на первую шину перед отрисовкой анимации
-  Wire.begin(SDA_1, SCL_1); 
-
-  display.clearDisplay();
-
-  if (showSmile) {
-    if (currentFrame == 0)
-      display.drawBitmap(0, 0, cat_happy_bmp, 128, 64, WHITE);
-    else if (currentFrame == 1 || currentFrame == 3)
-      display.drawBitmap(0, 0, cat_happy_blink_bmp, 128, 64, WHITE);
-    else if (currentFrame == 2)
-      display.drawBitmap(0, 0, cat_happy_closed_bmp, 128, 64, WHITE);
-  } else {
-    display.drawBitmap(0, 0, cat_sad_bmp, 128, 64, WHITE);
-  }
-
-  display.display();
-}
-
-// --- Функция отрисовки (для второго дисплея) ---
-void updateDisplay2(float temp, float hum) {
-  // Переключаемся на вторую шину перед отрисовкой
-  Wire.begin(SDA_2, SCL_2); 
+  display1.clearBuffer();
   
-  display2.clearDisplay();
-  display2.setTextColor(WHITE);
-  display2.setTextSize(2);
-  display2.setCursor(0, 10);
+  // Верхняя строка (Температура)
+  display1.setFont(u8g2_font_ncenB08_tr); // Мелкий шрифт
+  display1.setCursor(0, 20); // Y = 20 (базовая линия)
+  display1.print("TEMP: ");
+  
+  display1.setFont(u8g2_font_ncenB14_tr); // Крупный шрифт
+  display1.print(temp, 1);
+  
+  display1.setFont(u8g2_font_ncenB08_tr);
+  display1.print(" C");
+
+  // Нижняя строка (Влажность)
+  display1.setCursor(0, 55); // Y = 55 (базовая линия)
+  display1.print("HUM:  ");
+  
+  display1.setFont(u8g2_font_ncenB14_tr);
+  display1.print(hum, 1);
+  
+  display1.setFont(u8g2_font_ncenB08_tr);
+  display1.print(" %");
+  
+  display1.sendBuffer();
+}
+
+// Первый дисплей — кот с анимацией
+void updateCatDisplay() {
+  display1.clearBuffer();
+  
+  if (showSmile) {
+    if (currentFrame == 0) display1.drawXBMP(0, 0, 128, 64, cat_happy_bmp);
+    else if (currentFrame == 1 || currentFrame == 3) display1.drawXBMP(0, 0, 128, 64, cat_happy_blink_bmp);
+    else if (currentFrame == 2) display1.drawXBMP(0, 0, 128, 64, cat_happy_closed_bmp);
+  } else {
+    display1.drawXBMP(0, 0, 128, 64, cat_sad_bmp);
+  }
+  
+  display1.sendBuffer();
+}
+
+// Второй дисплей
+void updateDisplay2(float temp, float hum) {
+  display2.clearBuffer();
+  
+  display2.setFont(u8g2_font_ncenB14_tr); // Крупный шрифт для второго экрана
+  
+  display2.setCursor(0, 25);
   display2.print(temp, 1);
   display2.print(" C");
-  display2.setCursor(0, 36);
+  
+  display2.setCursor(0, 55);
   display2.print(hum, 1);
   display2.print(" %");
   
-  display2.display(); 
+  display2.sendBuffer(); 
 }
